@@ -2008,6 +2008,42 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
    * that makes it fill <code>pageFormat</code> imageable size if this attribute is <code>null</code>.
    */
   public int print(Graphics g, PageFormat pageFormat, int pageIndex) {
+    if (pageIndex < 0) {
+      return NO_SUCH_PAGE;
+    }
+    Level selectedLevel = this.home.getSelectedLevel();
+    try {
+      if (this.home.getLevels().isEmpty()) {
+        return printSelectedLevel(g, pageFormat, pageIndex);
+      }
+      for (Level level : this.home.getLevels()) {
+        if (!level.isViewable()) {
+          continue;
+        }
+        this.home.setSelectedLevel(level);
+        int levelPageCount = 1;
+        Rectangle2D bounds = getItemsBounds(g, getPaintedItems());
+        if (bounds != null && this.home.getPrint() != null
+            && this.home.getPrint().getPlanScale() != null) {
+          double scale = this.home.getPrint().getPlanScale() * LengthUnit.centimeterToInch(72);
+          int columns = Math.max(1, (int)Math.ceil(bounds.getWidth() * scale / pageFormat.getImageableWidth()));
+          int rows = Math.max(1, (int)Math.ceil(bounds.getHeight() * scale / pageFormat.getImageableHeight()));
+          levelPageCount = columns * rows;
+        }
+        if (pageIndex < levelPageCount) {
+          // An empty viewable level still gets its own blank plan page.
+          return bounds == null ? PAGE_EXISTS : printSelectedLevel(g, pageFormat, pageIndex);
+        }
+        pageIndex -= levelPageCount;
+      }
+      return NO_SUCH_PAGE;
+    } finally {
+      this.home.setSelectedLevel(selectedLevel);
+    }
+  }
+
+  /** Prints a page of the temporarily selected level. */
+  private int printSelectedLevel(Graphics g, PageFormat pageFormat, int pageIndex) {
     List<Selectable> printedItems = getPaintedItems(); 
     Rectangle2D printedItemBounds = getItemsBounds(g, printedItems);
     if (printedItemBounds != null) {
